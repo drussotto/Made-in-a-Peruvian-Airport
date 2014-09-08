@@ -1,0 +1,412 @@
+#lang racket
+
+(require 2htdp/image)
+(require 2htdp/universe)
+
+
+(define BACKGROUND (empty-scene 500 500))
+
+(define-struct fish (loc size dir))
+
+(define-struct missile (loc dir))
+
+(define-struct world (player lof cookie missiles timer))
+
+(define-struct posn (x y))
+
+(define player0 (make-fish (make-posn 100 100) 10 'right))
+
+(define fish1 (make-fish (make-posn 90 60) 20 'right))
+(define fish2 (make-fish (make-posn 145 60) 8 'left))
+(define fish3 (make-fish (make-posn 62 180) 12 'up))
+(define fish4 (make-fish (make-posn 36 86) 24 'down)) 
+
+(define list1 (list fish1 fish2 fish3 fish4))
+
+
+(define world0 (make-world player0 
+                           list1 
+                           (make-posn 100 100) 
+                           (list 
+                            (make-missile (make-posn 10 10) 'left)
+                            (make-missile (make-posn 20 20) 'right)) 
+                           0))
+
+
+(define (main n)
+  (real->decimal-string (/ (world-timer (big-bang (generate-world n)
+                                                  [to-draw render]
+                                                  [on-tick play-game]
+                                                  [on-key change-dir]
+                                                  [stop-when dead? GO])) 28)))
+
+
+(define (render w)
+  (draw-fish w (draw-player w (draw-missiles w (draw-cookie w BACKGROUND)))))
+
+
+(define (draw-fish w img)
+  (cond [(empty? (world-lof w)) img]
+        [(cons? (world-lof w))
+         (place-image (circle (fish-size (first (world-lof w))) 'solid 'blue) 
+                      (posn-x (fish-loc (first (world-lof w))))
+                      (posn-y (fish-loc (first (world-lof w))))
+                      (draw-fish (make-world (world-player w)
+                                             (rest (world-lof w))
+                                             (world-cookie w)
+                                             (world-missiles w)
+                                             (world-timer w)) img))]))
+
+(define (draw-player w img)
+  (place-image (circle (fish-size (world-player w)) 'solid 'red) 
+               (posn-x (fish-loc (world-player w)))
+               (posn-y (fish-loc (world-player w)))
+               img))
+
+(define (draw-cookie w img)
+  (place-image (triangle 10 'solid 'green) 
+               (posn-x (world-cookie w))
+               (posn-y (world-cookie w))
+               img))
+(define (draw-missiles w img)
+  (cond [(empty? (world-missiles w)) img]
+        [(cons? (world-missiles w))
+         (place-image (rectangle 5 5 'solid 'black)
+                      (posn-x (missile-loc (first (world-missiles w))))
+                      (posn-y (missile-loc (first (world-missiles w))))
+                      (draw-missiles (make-world (world-player w)
+                                                 (world-lof w)
+                                                 (world-cookie w)
+                                                 (rest (world-missiles w))
+                                                 (world-timer w)) img))]))
+
+
+(define (move-player w)
+  (cond [(symbol=? (fish-dir (world-player w)) 'right)
+         (make-world (make-fish (make-posn (+ 5 (posn-x (fish-loc (world-player w))))
+                                           (posn-y (fish-loc (world-player w))))
+                                (fish-size (world-player w))
+                                (fish-dir (world-player w)))
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(symbol=? (fish-dir (world-player w)) 'left)
+         (make-world (make-fish (make-posn (- (posn-x (fish-loc (world-player w))) 5)
+                                           (posn-y (fish-loc (world-player w))))
+                                (fish-size (world-player w))
+                                (fish-dir (world-player w)))
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(symbol=? (fish-dir (world-player w)) 'up)
+         (make-world (make-fish (make-posn (posn-x (fish-loc (world-player w)))
+                                           (- (posn-y (fish-loc (world-player w))) 5))
+                                (fish-size (world-player w))
+                                (fish-dir (world-player w)))
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(symbol=? (fish-dir (world-player w)) 'down)
+         (make-world (make-fish (make-posn (posn-x (fish-loc (world-player w)))
+                                           (+ 5 (posn-y (fish-loc (world-player w)))))
+                                (fish-size (world-player w))
+                                (fish-dir (world-player w)))
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]))
+
+(define (change-dir w ke)
+  (cond [(or (string=? ke "left") (string=? ke "a"))
+         (make-world (make-fish (fish-loc (world-player w))
+                                (fish-size (world-player w))
+                                'left)
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(or (string=? ke "right") (string=? "d" ke))
+         (make-world (make-fish (fish-loc (world-player w))
+                                (fish-size (world-player w))
+                                'right)
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(or (string=? ke "up") (string=? ke "w"))
+         (make-world (make-fish (fish-loc (world-player w))
+                                (fish-size (world-player w))
+                                'up)
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(or (string=? ke "down") (string=? ke "s"))
+         (make-world (make-fish (fish-loc (world-player w))
+                                (fish-size (world-player w))
+                                'down)
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(string=? ke " ")
+         (make-world (world-player w)
+                     (world-lof w)
+                     (world-cookie w)
+                     (cons (make-missile (make-posn (posn-x (fish-loc (world-player w)))
+                                                    (posn-y (fish-loc (world-player w))))
+                                         (fish-dir (world-player w)))
+                           (world-missiles w))
+                     (world-timer w))]
+        [else w])) 
+
+(define (swim-left f)
+  (make-fish (make-posn (- (posn-x (fish-loc f)) 5)
+                        (posn-y (fish-loc f)))
+             (fish-size f)
+             (fish-dir f)))
+
+(define (swim-right f)
+  (make-fish (make-posn (+ 5 (posn-x (fish-loc f)))
+                        (posn-y (fish-loc f)))
+             (fish-size f)
+             (fish-dir f)))
+
+(define (swim-up f)
+  (make-fish (make-posn (posn-x (fish-loc f))
+                        (- (posn-y (fish-loc f)) 5))
+             (fish-size f)
+             (fish-dir f)))
+
+(define (swim-down f)
+  (make-fish (make-posn (posn-x (fish-loc f))
+                        (+ (posn-y (fish-loc f)) 5))
+             (fish-size f)
+             (fish-dir f)))
+
+(define (swim f)
+  (cond [(symbol=? 'right (fish-dir f))
+         (swim-right f)]
+        [(symbol=? 'left (fish-dir f))
+         (swim-left f)]
+        [(symbol=? 'up (fish-dir f))
+         (swim-up f)]
+        [(symbol=? 'down (fish-dir f))
+         (swim-down f)]))
+
+(define (move-fish w)
+  (make-world (world-player w)
+              (map swim (world-lof w)) (world-cookie w) (world-missiles w) (world-timer w)))
+
+(define (about-face f)
+  (cond [(> (posn-x (fish-loc f)) 500)
+         (make-fish (fish-loc f) (fish-size f) 'left)]
+        [(< (posn-x (fish-loc f)) 0)
+         (make-fish (fish-loc f) (fish-size f) 'right)]
+        [(> (posn-y (fish-loc f)) 500)
+         (make-fish (fish-loc f) (fish-size f) 'up)]
+        [(< (posn-y (fish-loc f)) 0)
+         (make-fish (fish-loc f) (fish-size f) 'down)]
+        [else f]))
+
+(define (maintain w)
+  (make-world (world-player w) (map about-face (world-lof w)) (world-cookie w) (world-missiles w) (world-timer w)))
+
+(define (challenge w)
+  (local [(define (swell f)
+            (make-fish (fish-loc f)
+                       (+ .2 (fish-size f))
+                       (fish-dir f)))]
+    (make-world (world-player w) (map swell (world-lof w)) (world-cookie w) (world-missiles w) (world-timer w))))
+
+(define (tick w)
+  (make-world (world-player w) (world-lof w) (world-cookie w) (world-missiles w) (add1 (world-timer w))))
+
+(define (move-missiles w) ;;RELEVANT
+  (local [(define (fire m)
+            (cond [(symbol=? (missile-dir m) 'left) 
+                   (make-missile (make-posn (- (posn-x (missile-loc m)) 10)
+                                            (posn-y (missile-loc m)))
+                                 (missile-dir m))]
+                  [(symbol=? (missile-dir m) 'right) 
+                   (make-missile (make-posn (+ (posn-x (missile-loc m)) 10)
+                                            (posn-y (missile-loc m)))
+                                 (missile-dir m))]
+                  [(symbol=? (missile-dir m) 'up)
+                   (make-missile (make-posn (posn-x (missile-loc m))
+                                            (- (posn-y (missile-loc m)) 10))
+                                 (missile-dir m))]
+                  [(symbol=? (missile-dir m) 'down)
+                   (make-missile (make-posn (posn-x (missile-loc m))
+                                            (+ (posn-y (missile-loc m)) 10))
+                                 (missile-dir m))]))]
+    (make-world (world-player w) (world-lof w) (world-cookie w) 
+                (map fire (world-missiles w)) (world-timer w))))
+
+(define (swap-sides w)
+  (cond [(> (posn-x (fish-loc (world-player w))) 500)
+         (make-world (make-fish (make-posn 0
+                                           (posn-y (fish-loc (world-player w))))
+                                (fish-size (world-player w))
+                                (fish-dir (world-player w)))
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(< (posn-x (fish-loc (world-player w))) 0)
+         (make-world (make-fish (make-posn 500
+                                           (posn-y (fish-loc (world-player w))))
+                                (fish-size (world-player w))
+                                (fish-dir (world-player w)))
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(> (posn-y (fish-loc (world-player w))) 500)
+         (make-world (make-fish (make-posn (posn-x (fish-loc (world-player w)))
+                                           0)
+                                (fish-size (world-player w))
+                                (fish-dir (world-player w)))
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))]
+        [(< (posn-y (fish-loc (world-player w))) 0)
+         (make-world (make-fish (make-posn (posn-x (fish-loc (world-player w)))
+                                           500)
+                                (fish-size (world-player w))
+                                (fish-dir (world-player w)))
+                     (world-lof w)
+                     (world-cookie w)
+                     (world-missiles w)
+                     (world-timer w))] 
+        [else w]))
+
+(define (eat-cookie w)
+  (local [(define (nibble? w)
+            (< (distance (fish-loc (world-player w))
+                         (world-cookie w))
+               10))]
+    (if (nibble? w)
+        (make-world (world-player w)
+                    (slim (world-lof w))
+                    (make-posn (random 500) (random 500))
+                    (world-missiles w)
+                    (world-timer w))
+        w)))
+
+(define (slim lof)
+  (local [(define (diet f)
+            (make-fish (fish-loc f)
+                       (* .5 (fish-size f))
+                       (fish-dir f)))]
+    (map diet lof)))
+
+(define (diminish m f) ;;RELEVANT
+  (if (< (distance (missile-loc m) (fish-loc f)) (fish-size f))
+      (make-fish (fish-loc f) (- (fish-size f) 5) (fish-dir f))  
+      f))
+
+(define (play-game w)
+  (fight-fish (move-missiles (eat-cookie (swap-sides (tick (challenge (maintain (move-fish (move-player w))))))))))
+
+(define (generate-world n)
+  (make-world (make-fish (make-posn (random 400)
+                                    (random 400))
+                         10
+                         (random-dir n))
+              (generate-fish n)
+              (make-posn (random 500) (random 500))
+              empty
+              0))
+
+(define (generate-fish n)
+  (if (= n 0) 
+      empty
+      (cons (make-fish (make-posn (random 500) (random 500))
+                       5
+                       (random-dir n))
+            (generate-fish (- n 1)))))
+
+(define (random-dir n)
+  (local [(define r (random 4))]
+    (cond [(= r 0) 'left]
+          [(= r 1) 'right]
+          [(= r 2) 'up]
+          [(= r 3) 'down])))
+
+
+(define (distance p1 p2)
+  (sqrt (+ (sqr (- (posn-x p2) (posn-x p1)))
+           (sqr (- (posn-y p2) (posn-y p1))))))
+
+(define (dead? w)
+  (local [(define (overlap? f)
+            (< (distance (fish-loc (world-player w)) (fish-loc f))
+               (fish-size f)))]
+    (or (ormap overlap? (world-lof w))
+        (> (posn-x (fish-loc (world-player w))) 500)
+        (> (posn-y (fish-loc (world-player w))) 500)
+        (< (posn-x (fish-loc (world-player w))) 0)
+        (< (posn-y (fish-loc (world-player w))) 0))))
+
+(define (GO w)
+  (local [(define survival (real->decimal-string (/ (world-timer w) 28)))]
+    (overlay (text  (string-append "Game Over! You survived " survival " seconds!")  25 'red) 
+             (render w))))
+
+;=================================================
+;ALL LINES OF CODE PAST THIS POINT ARE POST-AIRPORT
+;==================================================
+
+
+;Missile List-of Fish --> List-of Fish
+(define (damage m lof)
+  (local [(define (fct f)
+            (diminish m f))]
+    (map fct lof)))
+
+
+;LOM LOF -> LOF
+(define (barrage lom lof)
+  (cond [(empty? lom) lof]
+        [(cons? lom)
+         (barrage (rest lom) (damage (first lom) lof))])) 
+
+;LOM Fish -> LOM
+(define (remove-hits lom f)
+  (local [(define (far? m)
+            (> (distance (missile-loc m) (fish-loc f)) 
+               (fish-size f)))]
+    (filter far? lom)))
+
+;LOM LOF -> LOM
+(define (remove-all-hits lom lof)
+  (cond [(empty? lom) lom]
+        [(empty? lof) lom] 
+        [(cons? lof)
+         (remove-all-hits (remove-hits lom (first lof)) (rest lof))]))  
+
+;World -> World
+(define (fight-fish w)
+  (make-world
+   (world-player w)
+   (barrage (world-missiles w) (world-lof w))
+   (world-cookie w)
+   (remove-all-hits (world-missiles w) (world-lof w))
+   (world-timer w)))
+
+
+
+(main 10)
+
+
+
+
+
+
+
+
