@@ -6,13 +6,43 @@
 
 (define BACKGROUND (empty-scene 500 500))
 
+;; A Fish is a (make-fish Posn Number Symbol)
+;;   -loc: where the Fish currently is
+;;   -size: how big the Fish currently is
+;;   -dir: the direction that the Fish is currently going
+
+;; NOTE: Fish is a bit of a misnomer; they represent the 
+;; general term for enemies 
+
 (define-struct fish (loc size dir))
+
+;; A Missile is a (make-fish Posn Symbol)
+;;   -loc: where the Missile currently is
+;;   -dir: the direction the Missile is currently going
+
+;;Missiles will be fired by the player at the enemies
 
 (define-struct missile (loc dir))
 
+;; A World is a (make-world Fsh [List-of Fish] Posn [List-of Missile] Number)
+;;   -player: to represent who is playing the game
+;;   -lof: to represent the enemies in the game
+;;   -cookie: to represent the (location of) the cookie
+;;   -lof: to represent the missile that the player fires
+;;   -timer: to represent how long the game has been played (in seconds)
+
 (define-struct world (player lof cookie missiles timer))
 
+;; A Posn is a (make-posn Number Number)
+;;   -x: the x-coordinate in a Cartesian plane
+;;   -y: the y-coordinate in a Cartestian plane
+
+;; NOTE: the y-coordinate is positive in the downward direction
+;; and negative in the upward directoin
+
 (define-struct posn (x y))
+
+;Examples of Fish:
 
 (define player0 (make-fish (make-posn 100 100) 10 'right))
 
@@ -23,6 +53,7 @@
 
 (define list1 (list fish1 fish2 fish3 fish4))
 
+;Examples of a World:
 
 (define world0 (make-world player0 
                            list1 
@@ -32,6 +63,11 @@
                             (make-missile (make-posn 20 20) 'right)) 
                            0))
 
+;; main
+;; Number -> String
+;; Runs the game, outputs the number of seconds the game was played
+;; (rounded to 2 decimal places)
+
 
 (define (main n)
   (real->decimal-string (/ (world-timer (big-bang (generate-world n)
@@ -40,10 +76,16 @@
                                                   [on-key change-dir]
                                                   [stop-when dead? GO])) 28)))
 
+;render
+;World -> Image
+;Draws the game on the board
 
 (define (render w)
   (draw-fish w (draw-player w (draw-missiles w (draw-cookie w BACKGROUND)))))
 
+;; draw-fish
+;; World Image -> Image
+;; Draws the the Fish from the World onto the input image
 
 (define (draw-fish w img)
   (cond [(empty? (world-lof w)) img]
@@ -57,17 +99,29 @@
                                              (world-missiles w)
                                              (world-timer w)) img))]))
 
+;; draw-player
+;; World Image -> Image
+;; Draws the player in the World onto the input image
 (define (draw-player w img)
   (place-image (circle (fish-size (world-player w)) 'solid 'red) 
                (posn-x (fish-loc (world-player w)))
                (posn-y (fish-loc (world-player w)))
                img))
 
+;; draw-cookie
+;; World Image -> Image
+;; Draws the cookie from the World onto the input Image
+
 (define (draw-cookie w img)
   (place-image (triangle 10 'solid 'green) 
                (posn-x (world-cookie w))
                (posn-y (world-cookie w))
                img))
+
+;; draw-missiles
+;; World Image -> Image
+;; Draws the missiles from the World onto the input Image
+
 (define (draw-missiles w img)
   (cond [(empty? (world-missiles w)) img]
         [(cons? (world-missiles w))
@@ -80,44 +134,43 @@
                                                  (rest (world-missiles w))
                                                  (world-timer w)) img))]))
 
+;; move-player
+;; World -> World
+;; Moves the player 5 units in the direction specified
+;; by the (player-dir (world-player w))
+
 
 (define (move-player w)
   (cond [(symbol=? (fish-dir (world-player w)) 'right)
-         (make-world (make-fish (make-posn (+ 5 (posn-x (fish-loc (world-player w))))
-                                           (posn-y (fish-loc (world-player w))))
-                                (fish-size (world-player w))
-                                (fish-dir (world-player w)))
+         (make-world (swim-right (world-player w))
                      (world-lof w)
                      (world-cookie w)
                      (world-missiles w)
                      (world-timer w))]
         [(symbol=? (fish-dir (world-player w)) 'left)
-         (make-world (make-fish (make-posn (- (posn-x (fish-loc (world-player w))) 5)
-                                           (posn-y (fish-loc (world-player w))))
-                                (fish-size (world-player w))
-                                (fish-dir (world-player w)))
+         (make-world (swim-left (world-player w))
                      (world-lof w)
                      (world-cookie w)
                      (world-missiles w)
                      (world-timer w))]
         [(symbol=? (fish-dir (world-player w)) 'up)
-         (make-world (make-fish (make-posn (posn-x (fish-loc (world-player w)))
-                                           (- (posn-y (fish-loc (world-player w))) 5))
-                                (fish-size (world-player w))
-                                (fish-dir (world-player w)))
+         (make-world (swim-up (world-player w))
                      (world-lof w)
                      (world-cookie w)
                      (world-missiles w)
                      (world-timer w))]
         [(symbol=? (fish-dir (world-player w)) 'down)
-         (make-world (make-fish (make-posn (posn-x (fish-loc (world-player w)))
-                                           (+ 5 (posn-y (fish-loc (world-player w)))))
-                                (fish-size (world-player w))
-                                (fish-dir (world-player w)))
+         (make-world (swim-down (world-player w))
                      (world-lof w)
                      (world-cookie w)
                      (world-missiles w)
                      (world-timer w))]))
+
+;; change-dir
+;; World String -> World
+;; Changes the player's direction to the direction specified by ke.
+;; If (string=? " " ke), adds a missile to lof at the position of 
+;; the player
 
 (define (change-dir w ke)
   (cond [(or (string=? ke "left") (string=? ke "a"))
@@ -161,7 +214,11 @@
                                          (fish-dir (world-player w)))
                            (world-missiles w))
                      (world-timer w))]
-        [else w])) 
+        [else w]))
+
+;; swim-left
+;; Fish -> Fish
+;; Moves the input fish five positions to the left
 
 (define (swim-left f)
   (make-fish (make-posn (- (posn-x (fish-loc f)) 5)
@@ -169,11 +226,19 @@
              (fish-size f)
              (fish-dir f)))
 
+;; swim-right
+;; Fish -> Fish
+;; Moves the input fish five positions to the right
+
 (define (swim-right f)
   (make-fish (make-posn (+ 5 (posn-x (fish-loc f)))
                         (posn-y (fish-loc f)))
              (fish-size f)
              (fish-dir f)))
+
+;; swim-up
+;; Fish -> Fish
+;; Moves the input fish five positions upward
 
 (define (swim-up f)
   (make-fish (make-posn (posn-x (fish-loc f))
@@ -181,11 +246,20 @@
              (fish-size f)
              (fish-dir f)))
 
+;; swim-down
+;; Fish -> Fish
+;; Moves the input fish five positions downward
+
 (define (swim-down f)
   (make-fish (make-posn (posn-x (fish-loc f))
                         (+ (posn-y (fish-loc f)) 5))
              (fish-size f)
              (fish-dir f)))
+
+;; swim
+;; Fish -> Fish
+;; Moves the the fish in the direction specified 
+;; by (player-dir f)
 
 (define (swim f)
   (cond [(symbol=? 'right (fish-dir f))
@@ -197,9 +271,18 @@
         [(symbol=? 'down (fish-dir f))
          (swim-down f)]))
 
+;; move-fish
+;; World -> World
+;; Moves all the enemies in the World 
+
 (define (move-fish w)
   (make-world (world-player w)
               (map swim (world-lof w)) (world-cookie w) (world-missiles w) (world-timer w)))
+
+;; about-face
+;; Fish -> Fish
+;; Switches the direction of the Fish if it's reached
+;; the end of the board in any direction
 
 (define (about-face f)
   (cond [(> (posn-x (fish-loc f)) 500)
@@ -212,8 +295,16 @@
          (make-fish (fish-loc f) (fish-size f) 'down)]
         [else f]))
 
+;; maintain
+;; World -> World
+;; Maps about-face to all the enemies in the World
+
 (define (maintain w)
   (make-world (world-player w) (map about-face (world-lof w)) (world-cookie w) (world-missiles w) (world-timer w)))
+
+;; challenge
+;; World -> World
+;; Increases the size of all the enemies in this world by a small amount
 
 (define (challenge w)
   (local [(define (swell f)
@@ -222,8 +313,17 @@
                        (fish-dir f)))]
     (make-world (world-player w) (map swell (world-lof w)) (world-cookie w) (world-missiles w) (world-timer w))))
 
+;; tick
+;; World-> World
+;; Increments the timer by 1
+
 (define (tick w)
   (make-world (world-player w) (world-lof w) (world-cookie w) (world-missiles w) (add1 (world-timer w))))
+
+;; move-missiles
+;; World -> World
+;; Moves the all the missiles currently in the game 
+;; in the direction they should be going
 
 (define (move-missiles w) ;;RELEVANT
   (local [(define (fire m)
@@ -245,6 +345,11 @@
                                  (missile-dir m))]))]
     (make-world (world-player w) (world-lof w) (world-cookie w) 
                 (map fire (world-missiles w)) (world-timer w))))
+
+;; swap-sides
+;; World -> World
+;; Moves the player to the opposite side of the board
+;; if she has crossed the border
 
 (define (swap-sides w)
   (cond [(> (posn-x (fish-loc (world-player w))) 500)
@@ -285,6 +390,11 @@
                      (world-timer w))] 
         [else w]))
 
+;; eat-cookie
+;; World -> World
+;; If the player has eaten the cookie, halves the size of all
+;; the enemies in the game and makes a new cookie at a random position
+
 (define (eat-cookie w)
   (local [(define (nibble? w)
             (< (distance (fish-loc (world-player w))
@@ -298,6 +408,10 @@
                     (world-timer w))
         w)))
 
+;; slim
+;; [List-of Fish] -> [List-of Fish]
+;; Halves the size of all the Fish in this list
+
 (define (slim lof)
   (local [(define (diet f)
             (make-fish (fish-loc f)
@@ -305,13 +419,29 @@
                        (fish-dir f)))]
     (map diet lof)))
 
+;; diminish
+;; Missile Fish -> Fish
+;; Reduces the size of the Fish if the Fish and
+;; Missile overlap
+
 (define (diminish m f) ;;RELEVANT
   (if (< (distance (missile-loc m) (fish-loc f)) (fish-size f))
       (make-fish (fish-loc f) (- (fish-size f) 5) (fish-dir f))  
       f))
 
+;; play-game
+;; World-> World
+;; Handler for the on-tick portion of big-bang
+
+;;NOTE: This is just very poorly named
+
 (define (play-game w)
   (fight-fish (move-missiles (eat-cookie (swap-sides (tick (challenge (maintain (move-fish (move-player w))))))))))
+
+;; generate-world
+;; Number -> World
+;; Creates a new World with n enemies and distributes all
+;; the game elements randomly throughout the board
 
 (define (generate-world n)
   (make-world (make-fish (make-posn (random 400)
@@ -323,6 +453,10 @@
               empty
               0))
 
+;; generate-fish
+;; Number-> [List-of Fish]
+;; Generates a list of n fish with random positions
+
 (define (generate-fish n)
   (if (= n 0) 
       empty
@@ -331,6 +465,12 @@
                        (random-dir n))
             (generate-fish (- n 1)))))
 
+;; random-dir
+;; Any -> Symbol
+;; Creates a random direction
+
+;; NOTE: Input for this function is not used
+
 (define (random-dir n)
   (local [(define r (random 4))]
     (cond [(= r 0) 'left]
@@ -338,10 +478,18 @@
           [(= r 2) 'up]
           [(= r 3) 'down])))
 
+;; distance
+;; Posn Posn -> Number
+;; Calculates the distance between 2 points
+
 
 (define (distance p1 p2)
   (sqrt (+ (sqr (- (posn-x p2) (posn-x p1)))
            (sqr (- (posn-y p2) (posn-y p1))))))
+
+;; dead?
+;; World -> Boolean
+;; Has the player been hit by an enemy (Is the game over)?
 
 (define (dead? w)
   (local [(define (overlap? f)
@@ -353,44 +501,60 @@
         (< (posn-x (fish-loc (world-player w))) 0)
         (< (posn-y (fish-loc (world-player w))) 0))))
 
+;; GO 
+;; World -> Image
+;; Displays the text image signaling the end of the game
+
 (define (GO w)
   (local [(define survival (real->decimal-string (/ (world-timer w) 28)))]
     (overlay (text  (string-append "Game Over! You survived " survival " seconds!")  25 'red) 
              (render w))))
 
 ;=================================================
-;ALL LINES OF CODE PAST THIS POINT ARE POST-AIRPORT
+;ALL LINES OF CODE PAST THIS POINT ARE POST-AIRPORT (in case that's cheating
 ;==================================================
 
-
-;Missile List-of Fish --> List-of Fish
+;; damage
+;; Missile [List-of Fish] -> [List-of Fish]
+;; Diminishes any of the fish that the Missile overlaps with
 (define (damage m lof)
   (local [(define (fct f)
             (diminish m f))]
     (map fct lof)))
 
+;; barrage 
+;; [List-of Missile] [List-of Fish] -> [List-of Fish]
+;; Matches all the Missiles and Fish to diminish the overlapping Fish
 
-;LOM LOF -> LOF
 (define (barrage lom lof)
   (cond [(empty? lom) lof]
         [(cons? lom)
          (barrage (rest lom) (damage (first lom) lof))])) 
 
-;LOM Fish -> LOM
+;; remove-hits
+;; [List-of Missile] Fish -> [List-of Missile]
+;; Removes all the missiles that have made contact with the Fish
 (define (remove-hits lom f)
   (local [(define (far? m)
             (> (distance (missile-loc m) (fish-loc f)) 
                (fish-size f)))]
     (filter far? lom)))
 
-;LOM LOF -> LOM
+;; remove-all-hits
+;; [List-of Missile] [List-of Fish] -> [List-of Missile]
+;; Removes all the missiles from lom that have made contact
+;; with a fish in lof
+
 (define (remove-all-hits lom lof)
   (cond [(empty? lom) lom]
         [(empty? lof) lom] 
         [(cons? lof)
          (remove-all-hits (remove-hits lom (first lof)) (rest lof))]))  
 
-;World -> World
+;; fight-fish
+;; World -> World
+;; Removes all the missiles, diminishes all the fish
+
 (define (fight-fish w)
   (make-world
    (world-player w)
@@ -399,8 +563,7 @@
    (remove-all-hits (world-missiles w) (world-lof w))
    (world-timer w)))
 
-
-
+;;PLAY THE GAME!
 (main 10)
 
 
